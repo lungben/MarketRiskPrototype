@@ -13,6 +13,29 @@ macro bind(def, element)
     end
 end
 
+# ╔═╡ 214b7040-5424-11eb-20a0-3316520c333e
+begin
+	import Pkg
+	Pkg.activate(mktempdir())
+	# Pkg.add("Revise")
+	# using Revise
+	
+	Pkg.add(["DataFrames", "CSV", "TableIO", "Curves", "PlutoUI", "Plots", "ZipFile",  "ShiftedArrays", "Statistics", "Distributions", "CurrencyAmounts"])
+	
+	using DataFrames, CSV, TableIO, Curves, Dates, PlutoUI, Plots, ShiftedArrays, Statistics, Distributions
+	plotly()
+	
+	using CurrencyAmounts
+	const EUR = Currency(:EUR)
+	const USD = Currency(:USD)
+	const DKK = Currency(:DKK)
+	const SEK = Currency(:SEK)
+	const NOK = Currency(:NOK)
+	
+	Pkg.add(Pkg.PackageSpec(url="https://github.com/lungben/MarketRiskPrototype.git"))
+	using MarketRiskPrototype
+end
+
 # ╔═╡ ac41d630-54e2-11eb-3dde-f374a3e297c7
 md"""
 # Price Time Series and Historical Simulation VaR
@@ -22,6 +45,15 @@ md"""
 md"""
 ## Trade Definitions
 """
+
+# ╔═╡ b8665350-51e0-11eb-13f6-d902368ec2ab
+all_trades = [
+	FXForward(100000.0EUR, USD, 1.2USD/EUR, t"3M"),
+	FXForward(100000.0USD, EUR, 0.9EUR/USD, t"3M"),
+	FXForward(100000.0USD, SEK, 9.5SEK/USD, t"6M"),
+	FXForward(-100000.0USD, SEK, 8.5SEK/USD, t"1Y"),
+	FXForward(100000.0USD, EUR, 0.95EUR/USD, t"2M"),
+]
 
 # ╔═╡ bb8a57c0-54e2-11eb-05dd-cb81329ee0c0
 md"""
@@ -129,7 +161,7 @@ md"""
 
 # ╔═╡ 2745e320-51c9-11eb-026c-936376a7fe5d
 market_data_raw = let
-	df = DataFrame(read_table(joinpath(dirname(pathof(MarketRisk)), "../sample_data/cleansed_data.zip")); copycols=false)
+	df = DataFrame(read_table(joinpath(dirname(pathof(MarketRiskPrototype)), "../sample_data/cleansed_data.zip")); copycols=false)
 	df[!, :base_currency] = Symbol.(SubString.(df.name, Ref(1:3)))
 	df[!, :quote_currency] = Symbol.(SubString.(df.name, Ref(4:6)))
 	df[!, :tenor] = Tenor.(df[!, :tenor])
@@ -149,7 +181,7 @@ md"""
 
 # ╔═╡ 4877d970-51d5-11eb-0f68-ed0fc71dcd9c
 discount_data_raw = let
-	df = DataFrame(read_table(joinpath(dirname(pathof(MarketRisk)), "../sample_data/discount_factors_interpolated.zip")); copycols=false)
+	df = DataFrame(read_table(joinpath(dirname(pathof(MarketRiskPrototype)), "../sample_data/discount_factors_interpolated.zip")); copycols=false)
 	df[!, :base_currency] = Symbol.(df.currency)
 	df[!, :tenor] = get_tenor.(df[!, :MATURITY_OFFSET])
 	rename!(df, Dict(:Date => :date, :VALUE => :mid_value))
@@ -216,75 +248,8 @@ market_data_container = FXForwardMarketDataContainer(fx_forward_data, discount_d
 # ╔═╡ 90d7f930-541d-11eb-3e14-e750c274e6b2
 spot_rates = get_spot_rates(market_data_container)
 
-# ╔═╡ 1fad78a0-54dd-11eb-088f-c5f3cdb5adc0
-scenarios = create_historical_scenarios(market_data_container)
-
-# ╔═╡ 51c23a30-54d6-11eb-1895-b14d3e404c57
-market_risk_days = analysis_days[lookback_period+time_horizon+1:end]
-
-# ╔═╡ 36239c10-54d6-11eb-220a-31ecf19a578a
-@bind valuation_date Select(string.(market_risk_days), default=string(last(market_risk_days)))
-
-# ╔═╡ cbe7d790-51c8-11eb-1178-f5f8b9c59122
-md"""
-## Environment Setup
-"""
-
-# ╔═╡ 3523f4b0-51c8-11eb-020a-6f6442750802
-begin
-	import Pkg
-	Pkg.activate(mktempdir())
-	# Pkg.add("Revise")
-	# using Revise
-end
-
-# ╔═╡ 214b7040-5424-11eb-20a0-3316520c333e
-begin
-	Pkg.add(["DataFrames", "CSV", "TableIO", "Curves", "PlutoUI", "Plots", "ZipFile",  "ShiftedArrays", "Statistics", "Distributions", "CurrencyAmounts"])
-	using DataFrames, CSV, TableIO, Curves, Dates, PlutoUI, Plots, ShiftedArrays, Statistics, Distributions
-	plotly()
-	
-	using CurrencyAmounts
-	const EUR = Currency(:EUR)
-	const USD = Currency(:USD)
-	const DKK = Currency(:DKK)
-	const SEK = Currency(:SEK)
-	const NOK = Currency(:NOK)
-	
-	push!(LOAD_PATH, abspath(joinpath(pwd(), "..")))
-	using MarketRiskPrototype
-end
-
-# ╔═╡ b8665350-51e0-11eb-13f6-d902368ec2ab
-all_trades = [
-	FXForward(100000.0EUR, USD, 1.2USD/EUR, t"3M"),
-	FXForward(100000.0USD, EUR, 0.9EUR/USD, t"3M"),
-	FXForward(100000.0USD, SEK, 9.5SEK/USD, t"6M"),
-	FXForward(-100000.0USD, SEK, 8.5SEK/USD, t"1Y"),
-	FXForward(100000.0USD, EUR, 0.95EUR/USD, t"2M"),
-]
-
-# ╔═╡ c46e4a40-54dd-11eb-2f11-11f08927507e
-component_vars = value_at_risk.(all_trades, market_data_container, Date(valuation_date);
-	quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period)
-
-# ╔═╡ f2e7ea12-54de-11eb-14af-7fe117d7b403
-total_var = value_at_risk(all_trades, market_data_container, spot_rates, Date(valuation_date);
-	quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period)
-
 # ╔═╡ 7a0e8c30-51e0-11eb-2ce3-85387782af72
 all_prices = price_time_series.(all_trades, market_data_container)
-
-# ╔═╡ 626744e0-54de-11eb-0fa4-e7986b0ae98c
-scenario_pls = calculate_scenario_pls.(all_trades, scenarios)
-
-# ╔═╡ f71654b0-54e2-11eb-2a54-85bce080ff76
-if calc_var_ts
-	var_time_series = fetch.([Threads.@spawn value_at_risk(all_trades, market_data_container, spot_rates, dt; quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period) 
-		for dt in market_risk_days])
-else
-	var_time_series = nothing
-end
 
 # ╔═╡ 5e936750-541f-11eb-05a7-07ceb0979255
 all_prices_EUR = [convert.(EUR, x, Ref(values(spot_rates))) for x in all_prices]
@@ -302,6 +267,34 @@ end
 
 # ╔═╡ d6bb2370-54e3-11eb-04c4-3b82ec981bb6
 backtesting_pls = sum_prices[time_horizon+1:end] .- lag(sum_prices, time_horizon)[time_horizon+1:end]
+
+# ╔═╡ 1fad78a0-54dd-11eb-088f-c5f3cdb5adc0
+scenarios = create_historical_scenarios(market_data_container)
+
+# ╔═╡ 626744e0-54de-11eb-0fa4-e7986b0ae98c
+scenario_pls = calculate_scenario_pls.(all_trades, scenarios)
+
+# ╔═╡ 51c23a30-54d6-11eb-1895-b14d3e404c57
+market_risk_days = analysis_days[lookback_period+time_horizon+1:end]
+
+# ╔═╡ 36239c10-54d6-11eb-220a-31ecf19a578a
+@bind valuation_date Select(string.(market_risk_days), default=string(last(market_risk_days)))
+
+# ╔═╡ c46e4a40-54dd-11eb-2f11-11f08927507e
+component_vars = value_at_risk.(all_trades, market_data_container, Date(valuation_date);
+	quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period)
+
+# ╔═╡ f2e7ea12-54de-11eb-14af-7fe117d7b403
+total_var = value_at_risk(all_trades, market_data_container, spot_rates, Date(valuation_date);
+	quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period)
+
+# ╔═╡ f71654b0-54e2-11eb-2a54-85bce080ff76
+if calc_var_ts
+	var_time_series = fetch.([Threads.@spawn value_at_risk(all_trades, market_data_container, spot_rates, dt; quantile_value=confidence_level, time_horizon=time_horizon, lookback=lookback_period) 
+		for dt in market_risk_days])
+else
+	var_time_series = nothing
+end
 
 # ╔═╡ b4579480-54e3-11eb-344f-ed787fa284a7
 if var_time_series !== nothing
@@ -332,6 +325,11 @@ if calc_var_ts
 	Kupiec POF Traffic Light 🚦: $kupiec_tl_unicode
 	"""
 end
+
+# ╔═╡ cbe7d790-51c8-11eb-1178-f5f8b9c59122
+md"""
+## Environment Setup
+"""
 
 # ╔═╡ Cell order:
 # ╟─ac41d630-54e2-11eb-3dde-f374a3e297c7
@@ -387,5 +385,4 @@ end
 # ╠═e3623f10-51d6-11eb-335f-ef3d47c9897d
 # ╠═51c23a30-54d6-11eb-1895-b14d3e404c57
 # ╟─cbe7d790-51c8-11eb-1178-f5f8b9c59122
-# ╠═3523f4b0-51c8-11eb-020a-6f6442750802
 # ╠═214b7040-5424-11eb-20a0-3316520c333e
