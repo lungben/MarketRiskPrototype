@@ -1,0 +1,21 @@
+name = "MarketRiskPrototype"
+uuid = "428a5894-5655-448c-bb5b-eb10a6c2e747"
+authors = ["Benjamin Lungwitz <benj.lung@googlemail.com> and contributors"]
+version = "0.1.0"
+
+[deps]
+CurrencyAmounts = "35f9db7c-caf0-4b8b-9aa8-b55447bc07d3"
+Curves = "9bed79ab-e35b-4b7a-8527-918872a9571e"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+ShiftedArrays = "1277b4bf-5013-50f5-be3d-901d8477a67a"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

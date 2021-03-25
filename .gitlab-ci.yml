@@ -1,0 +1,12 @@
+image: julia:latest
+
+stages:
+  - test
+
+variables:
+  JULIA_NUM_THREADS: 2
+
+unittest:
+  stage: test
+  script:
+    - julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(); Pkg.test();'
